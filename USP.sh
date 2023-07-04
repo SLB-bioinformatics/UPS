@@ -163,18 +163,31 @@ for Current_Patient_id in $Unique_Patient_ids; do
     fi
 
     ##########################   Calling SVs    ##########################
-    #Create a folder for Manta
+
+    #run manta
     if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Structural_Variant/Manta" ]; then
         mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
     fi
 
-    #run manta
     cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
     if [ ! -f "tumorSV.vcf.gz" ]; then
         while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                 sleep 60
         done
         #sbatch "$UPS_Script_File""UPS_SV_Manta.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+    fi
+
+    #run Lumpy
+    if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Structural_Variant/Lumpy" ]; then
+        mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+    fi
+
+    cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+    if [ ! -f "Lumpy.vcf" ]; then
+        while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                sleep 60
+        done
+        #sbatch "$UPS_Script_File""UPS_SV_Lumpy.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
     fi
 
     ##########################   Calling CNVs    ##########################
