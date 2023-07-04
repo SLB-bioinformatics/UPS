@@ -11,12 +11,15 @@ Count_Batch_Jobs() {
     #echo=Current_Job_Count
 }
 
-#get SampleGuide.csv
+#set variables 
 Sample_Guide="/mnt/beegfs/hassan/Stuart/UniformProcessingOfSamples/TestData/SampleGuideOneSample.csv"
 SSR_Path="/mnt/beegfs/hassan/dbGAP_Ewings/"
 Working_Directory_Path="/mnt/beegfs/hassan/Stuart/UniformProcessingOfSamples/"
 Reference_Genome="/mnt/beegfs/hassan/Stuart/UniformProcessingOfSamples/TestData/Index/Homo_sapiens_assembly38.fasta"
 UPS_Script_File="/mnt/beegfs/hassan/Stuart/UniformProcessingOfSamples/Scripts/UPS_Scripts/"
+Chromosome_Of_Intrest="Chr17"
+Gene_of_Intrest="TP53"
+
 
 Count_Batch_Jobs() {
 squeue -u path1357 -t PD -o %i | wc -l
@@ -95,7 +98,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
     fi
     cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/BAM"
     
-     #Create convert Fastq to Bam by mapping to reference genome
+    #Create convert Fastq to Bam by mapping to reference genome
     for Current_SSR in $matching_values; do
         if [ ! -f "${Current_SSR}.bam" ]; then
             echo "BAM Needed for $Current_SSR"
@@ -143,11 +146,35 @@ for Current_Patient_id in $Unique_Patient_ids; do
     echo "$Patient_Tumour_WGS_Bam"
     echo "$Patient_Normal_WGS_Bam"
 
-    #Calling SVs
+
+    ##########################   Calling SNVs    ##########################
+    #Create a folder for Mutec
+    if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Single_Nucleotide_Variant/Mutect" ]; then
+        mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
+    fi
+
+    #run Mutect
+    cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
+    if [ ! -f "tumorSV.vcf.gz" ]; then
+        while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                sleep 60
+        done
+        sbatch "$UPS_Script_File""UPS_SV_Mutect.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+    fi
+
+    ##########################   Calling SVs    ##########################
     #Create a folder for Manta
     if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Structural_Variant/Manta" ]; then
         mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
     fi
+
+    #run manta
     cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
+    if [ ! -f "tumorSV.vcf.gz" ]; then
+        while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                sleep 60
+        done
+        sbatch "$UPS_Script_File""UPS_SV_Manta.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+    fi
 
 done 
