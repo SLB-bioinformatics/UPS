@@ -75,6 +75,8 @@ for Current_Patient_id in $Unique_Patient_ids; do
             sbatch "$UPS_Script_File""UPS_Fastq-dump.sh" "$File_For_Extraction"
 
         fi
+        # check file names are in the correct format
+        sbatch "$UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_1.fastq.gz"
     done
 done 
 
@@ -147,7 +149,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
     echo "$Patient_Normal_WGS_Bam"
 
     if [[ -n "$Patient_Tumour_WGS_SSR" && -n "$Patient_Normal_WGS_SSR" ]]; then
-    echo "$Current_Patient_id Tumour vs Normal analysis "
+        echo "$Current_Patient_id Tumour vs Normal analysis "
     
         ##########################   Calling SNVs    ##########################
         #Create a folder for Mutec
@@ -206,7 +208,9 @@ for Current_Patient_id in $Unique_Patient_ids; do
             done
             #sbatch "$UPS_Script_File""UPS_CNV_CNVKit.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
         fi
+    elif [[ -n "$Patient_Tumour_WGS_SSR" ]]; then
+        echo "$Current_Patient_id Tumour only analysis "
     else
-    echo "echo "$Current_Patient_id Tumour only analysis "
+        echo "Error: No genomic information found for $Current_Patient_id"
     fi
 done 
