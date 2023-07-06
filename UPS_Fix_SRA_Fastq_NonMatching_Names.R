@@ -1,6 +1,7 @@
-#To prevent the bwa error :paired reads have different names
+
 
 library(stringr)
+library(utils)
 
 # Command line arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -20,7 +21,7 @@ convert_read_identifier <- function(read_identifier) {
 }
 
 # Open input and output files
-con_in <- file(input_file, "r")
+con_in <- gzfile(input_file, "r")
 con_out <- file(output_file, "w")
 
 # Process input file line by line

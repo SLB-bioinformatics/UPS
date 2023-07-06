@@ -76,7 +76,9 @@ for Current_Patient_id in $Unique_Patient_ids; do
 
         fi
         # check file names are in the correct format
-        sbatch "$UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_1.fastq.gz"
+        echo "Checking fastq file"
+        sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_1.fastq.gz" "$UPS_Script_File"
+        sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_2.fastq.gz" "$UPS_Script_File"
     done
 done 
 

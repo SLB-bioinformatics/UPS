@@ -22,15 +22,16 @@ if [ $# -ne 4 ]; then
 fi
 
 # Aligning the input files
-bwa aln "${Reference_Genome}" "${File1}" > "${Current_Sample}_1.sai"
-bwa aln "${Reference_Genome}" "${File2}" > "${Current_Sample}_2.sai"
+if [ ! -f "${Current_Sample}_1.sai" ]; then
+  bwa aln "${Reference_Genome}" "${File1}" > "${Current_Sample}_1.sai"
+fi
+
+if [ ! -f "${Current_Sample}_2.sai" ]; then
+  bwa aln "${Reference_Genome}" "${File2}" > "${Current_Sample}_2.sai"
+fi
 
 # Generating a SAM file by pairing the aligned sequences from both input files with the reference genome
-bwa sampe "${Reference_Genome}" "$Current_Sample""_1.sai" "$Current_Sample""_2.sai" "${File1}" "${File2}" > "$Current_Sample"".sam"
-
-# Run BWA mem to align sequencing reads to the reference genome
-#bwa mem "${Reference_Genome}" "${File1}" "${File2}" > "${Current_Sample}.sam"
-
+bwa sampe "${Reference_Genome}" "${Current_Sample}_1.sai" "${Current_Sample}_2.sai" "${File1}" "${File2}" > "${Current_Sample}.sam"
 
 # Convert SAM to BAM using Samtools
-samtools view -S -b "$Current_Sample"".sam" > "$Current_Sample"".bam"
+samtools view -S -b "${Current_Sample}.sam" > "${Current_Sample}.bam"
