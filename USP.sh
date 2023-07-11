@@ -262,7 +262,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
             while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 60
             done
-            sbatch "$UPS_Script_File""UPS_SNV_Mutect_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
+            #sbatch "$UPS_Script_File""UPS_SNV_Mutect_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
         fi
 
         ##########################   Calling SVs    ##########################
