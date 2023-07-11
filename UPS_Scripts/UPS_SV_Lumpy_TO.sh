@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=SV_LUMPY
+#SBATCH --job-name=SV_LUMPY_TO
 
 module load LUMPY
 module load SAMTOOLS
@@ -14,9 +14,8 @@ samtools view -b -F 1294 "$Tumour_Bam" > Tumour.discordants.unsorted.bam
 
 # Extract the split-read alignments
 samtools view -h "$Tumour_Bam" \
-    | scripts/extractSplitReads_BwaMem -i stdin \
-    | samtools view -Sb - \
-    > Tumour.splitters.unsorted.bam
+    | ./lumpy-sv/scripts/extractSplitReads_BwaMem -i stdin \
+    | samtools view -Sb - \> Tumour.splitters.unsorted.bam
 
 samtools sort Tumour.discordants.unsorted.bam Tumour.discordants.bam
 samtools sort Tumour.splitters.unsorted.bam Tumour.splitters.bam
