@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=USP
 export NCBI_HOME=/mnt/beegfs/hassan/Stuart/
-#Extract fastQ from SSR files and prefrom Fastqc on the file to get basic statisics and check sequence quality 
 
 #Set the maximum number of jobs that can run at once
 Batch_Job_Limit=5
@@ -43,7 +42,7 @@ if [ ! -d "$Working_Directory_Path""UPS/Samples" ]; then
     mkdir -p "$Working_Directory_Path""UPS/Samples"
 fi
 
-#Create Sample folders and Exstract Fastq from sra files
+##################   Create Sample folders   ##################
 for Current_Patient_id in $Unique_Patient_ids; do
     #Create a folder for each Patient 
     if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id" ]; then
@@ -54,32 +53,70 @@ for Current_Patient_id in $Unique_Patient_ids; do
     if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/FastQ" ]; then
         mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/FastQ"
     fi
+done 
 
-    echo "Processing Patient ID: $Current_Patient_id"
-    # Find rows that match the current value in column 4
+##################   Exstract Fastq from sra files    ##################
+for Current_Patient_id in $Unique_Patient_ids; do
     matching_rows=$(awk -F ',' -v col4="$Current_Patient_id" 'BEGIN {OFS=","} $4 == col4' "$Sample_Guide")
-    # Select the matching rows from column 5
     matching_values=$(echo "$matching_rows" | cut -d ',' -f 8| tr -d '\r')
-    for Current_SSR in $matching_values; do
-        echo "$SSR_Path""$Current_SSR"
-        cd "$Working_Directory_Path/UPS/Samples/$Current_Patient_id/FastQ"
-        if [ ! -f "$Current_SSR""_pass_1.fastq.gz" ]; then
-            #Extract FastQ from SSR file
-            echo "Extraction Needed for $Current_SSR"
-            while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]
-            do
-                sleep 60
-            done
-            File_For_Extraction="$SSR_Path""$Current_SSR"
-            echo "$File_For_Extraction"
-            sbatch "$UPS_Script_File""UPS_Fastq-dump.sh" "$File_For_Extraction"
+    File_Types=$(echo "$matching_rows" | cut -d ',' -f 9| tr -d '\r')
+    if echo "$File_Types" | grep -q "SSR"; then
+        # Find rows that match the current value in column 4
+        # Select the matching rows from column 5
+        for Current_SSR in $matching_values; do
+            echo "Processing Patient ID: $Current_Patient_id"
+            echo "$SSR_Path""$Current_SSR"
+            cd "$Working_Directory_Path/UPS/Samples/$Current_Patient_id/FastQ"
+            if [ ! -f "$Current_SSR""_pass_1.fastq.gz" ]; then
+                #Extract FastQ from SSR file
+                echo "Extraction Needed for $Current_SSR"
+                while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]
+                do
+                    sleep 60
+                done
+                Current_SSR_row=$(echo "$matching_rows" | awk -F ',' -v col8="$Current_SSR" 'BEGIN {OFS=","} $8 == col8')
+                File_For_Extraction=$(echo "$matching_row" | cut -d ',' -f 10)
+                echo "$File_For_Extraction"
+                sbatch "$UPS_Script_File""UPS_Fastq-dump.sh" "$File_For_Extraction"
+            fi
+            # check file names are in the correct format
+            echo "Checking fastq file"
+            sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_1.fastq.gz" "$UPS_Script_File"
+            sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_2.fastq.gz" "$UPS_Script_File"
+        done
+    fi
+done 
 
-        fi
-        # check file names are in the correct format
-        echo "Checking fastq file"
-        sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_1.fastq.gz" "$UPS_Script_File"
-        sbatch "$UPS_Script_File""UPS_Fix_SRA_Fastq_NonMatching_Names.sh" "${Current_SSR}_pass_2.fastq.gz" "$UPS_Script_File"
-    done
+##################   If Input FileType is Bam    ##################
+for Current_Patient_id in $Unique_Patient_ids; do
+    matching_rows=$(awk -F ',' -v col4="$Current_Patient_id" 'BEGIN {OFS=","} $4 == col4' "$Sample_Guide")
+    matching_values=$(echo "$matching_rows" | cut -d ',' -f 8| tr -d '\r')
+    File_Types=$(echo "$matching_rows" | cut -d ',' -f 9| tr -d '\r')
+    if echo "$File_Types" | grep -q "Bam"; then
+        # Find rows that match the current value in column 4
+        # Select the matching rows from column 5
+        for Current_SSR in $matching_values; do
+            echo "Processing Patient ID: $Current_Patient_id"
+            echo "$SSR_Path""$Current_SSR"
+            #Create a folder for each Patient bam
+            if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/BAM" ]; then
+                mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/BAM"
+            fi
+            cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/BAM"
+            if [ ! -f "${Current_SSR}.bam" ]; then
+                #Extract FastQ from SSR file
+                echo "Extraction Needed for $Current_SSR"
+                while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]
+                do
+                    sleep 60
+                done
+                Current_SSR_row=$(echo "$matching_rows" | awk -F ',' -v col8="$Current_SSR" 'BEGIN {OFS=","} $8 == col8')
+                File_For_Extraction=$(echo "$matching_row" | cut -d ',' -f 10)
+                echo "$File_For_Extraction"
+                cp "$File_For_Extraction" .
+            fi
+        done
+    fi
 done 
 
 #Wait untill all Fastq_dump jobs have finished running 
@@ -90,7 +127,7 @@ do
     Fastq_Dump_Jobs_Running=$(squeue -u path1357 -h -o "%i" | grep "Fastq-dump" | wc -l)
 done
 
-#Create Bams 
+#######################   Create Bams   #######################
 for Current_Patient_id in $Unique_Patient_ids; do
     echo "Processing Patient ID: $Current_Patient_id"
     matching_rows=$(awk -F ',' -v col4="$Current_Patient_id" 'BEGIN {OFS=","} $4 == col4' "$Sample_Guide")
@@ -118,12 +155,12 @@ done
 
 
 #Wait untill all Fastq_To_Bam have finished running Hashed out
-#Fastq_Dump_Jobs_Running=$(squeue -u path1357 -h -o "%i" | grep "Fastq-dump" | wc -l)
-#while [ $Fastq_Dump_Jobs_Running -gt 0 ]
-#do
-#    sleep 60
-#    Fastq_Dump_Jobs_Running=$(squeue -u path1357 -h -o "%i" | grep "Fastq-dump" | wc -l)
-#done
+Fastq_Dump_Jobs_Running=$(squeue -u path1357 -h -o "%i" | grep "Fastq-dump" | wc -l)
+while [ $Fastq_Dump_Jobs_Running -gt 0 ]
+do
+    sleep 60
+    Fastq_Dump_Jobs_Running=$(squeue -u path1357 -h -o "%i" | grep "Fastq-dump" | wc -l)
+done
 
 # calls SNVs SV and CNVs
 for Current_Patient_id in $Unique_Patient_ids; do
@@ -151,8 +188,8 @@ for Current_Patient_id in $Unique_Patient_ids; do
     echo "$Patient_Normal_WGS_Bam"
 
     if [[ -n "$Patient_Tumour_WGS_SSR" && -n "$Patient_Normal_WGS_SSR" ]]; then
+        #################################################### Tumour Normal Analysis ####################################################
         echo "$Current_Patient_id Tumour vs Normal analysis "
-    
         ##########################   Calling SNVs    ##########################
         #Create a folder for Mutec
         if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Single_Nucleotide_Variant/Mutect" ]; then
@@ -165,7 +202,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
             while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 60
             done
-            #sbatch "$UPS_Script_File""UPS_SV_Mutect.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+            #sbatch "$UPS_Script_File""UPS_SNV_Mutect_TN.sh" "$Reference_Genome_Index" "$Patient_Tumour_WGS_Bam" 
         fi
 
         ##########################   Calling SVs    ##########################
@@ -180,7 +217,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
             while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 60
             done
-            #sbatch "$UPS_Script_File""UPS_SV_Manta.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+            #sbatch "$UPS_Script_File""UPS_SV_Manta_TN.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
         fi
 
         #run Lumpy
@@ -193,7 +230,7 @@ for Current_Patient_id in $Unique_Patient_ids; do
             while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 60
             done
-            #sbatch "$UPS_Script_File""UPS_SV_Lumpy.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+            #sbatch "$UPS_Script_File""UPS_SV_Lumpy_TN.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
         fi
 
         ##########################   Calling CNVs    ##########################
@@ -208,10 +245,68 @@ for Current_Patient_id in $Unique_Patient_ids; do
             while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 60
             done
-            #sbatch "$UPS_Script_File""UPS_CNV_CNVKit.sh" "$Reference_Genome" "$Patient_Normal_WGS_Bam" "$Patient_Tumour_WGS_Bam" 
+            #sbatch "$UPS_Script_File""UPS_CNV_CNVkit_TN.sh" "$Reference_Genome""$Patient_Tumour_WGS_Bam" 
         fi
     elif [[ -n "$Patient_Tumour_WGS_SSR" ]]; then
-        echo "$Current_Patient_id Tumour only analysis "
+        #################################################### Tumour Only Analysis ####################################################
+        echo "$Current_Patient_id Tumour only analysis"
+         ##########################   Calling SNVs    ##########################
+        #Create a folder for Mutec
+        if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Single_Nucleotide_Variant/Mutect" ]; then
+            mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
+        fi
+
+        #run Mutect
+        cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
+        if [ ! -f "Mutect2_filtered.vcf" ]; then
+            while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                    sleep 60
+            done
+            sbatch "$UPS_Script_File""UPS_SNV_Mutect_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
+        fi
+
+        ##########################   Calling SVs    ##########################
+
+        #run manta
+        if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Structural_Variant/Manta" ]; then
+            mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
+        fi
+
+        cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
+        if [ ! -f "tumorSV.vcf.gz" ]; then
+            while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                    sleep 60
+            done
+            #sbatch "$UPS_Script_File""UPS_SV_Manta_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
+        fi
+
+        #run Lumpy
+        if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Structural_Variant/Lumpy" ]; then
+            mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+        fi
+
+        cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+        if [ ! -f "Lumpy.vcf" ]; then
+            while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                    sleep 60
+            done
+            sbatch "$UPS_Script_File""UPS_SV_Lumpy_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
+        fi
+
+        ##########################   Calling CNVs    ##########################
+        #Create a folder for Manta
+        if [ ! -d "$Working_Directory_Path""UPS/Samples/""$Current_Patient_id/Copy_Number_Variation/CNVkit" ]; then
+            mkdir -p "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Copy_Number_Variation/CNVkit"
+        fi
+
+        #run manta
+        cd "$Working_Directory_Path""UPS/Samples/$Current_Patient_id/Copy_Number_Variation/CNVkit"
+        if [ ! -f "tumorSV.vcf.gz" ]; then
+            while [[ $(Count_Batch_Jobs) -gt $Batch_Job_Limit ]]; do
+                    sleep 60
+            done
+            sbatch "$UPS_Script_File""UPS_CNV_CNVkit_TO.sh" "$Reference_Genome" "$Patient_Tumour_WGS_Bam" 
+        fi
     else
         echo "Error: No genomic information found for $Current_Patient_id"
     fi
