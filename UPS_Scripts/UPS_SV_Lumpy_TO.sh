@@ -17,8 +17,8 @@ samtools view -h "$Tumour_Bam" \
     | ./lumpy-sv/scripts/extractSplitReads_BwaMem -i stdin \
     | samtools view -Sb - \> Tumour.splitters.unsorted.bam
 
-samtools sort Tumour.discordants.unsorted.bam Tumour.discordants.bam
-samtools sort Tumour.splitters.unsorted.bam Tumour.splitters.bam
+samtools sort Tumour.discordants.unsorted.bam -o Tumour.discordants.bam
+samtools sort Tumour.splitters.unsorted.bam -o Tumour.splitters.bam
 
 lumpyexpress \
     -B $Tumour_Bam \

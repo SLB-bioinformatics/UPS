@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=SV_LUMPY
+#SBATCH --job-name=SV_LUMPY_TN
 
 module load LUMPY
 module load SAMTOOLS
@@ -18,8 +18,8 @@ samtools view -h "$Normal_Bam" \
     | samtools view -Sb - \
     > Normal.splitters.unsorted.bam
 
-samtools sort Normal.discordants.unsorted.bam Normal.discordants.bam
-samtools sort Normal.splitters.unsorted.bam Normal.splitters.bam
+samtools sort Normal.discordants.unsorted.bam -o Normal.discordants.bam
+samtools sort Normal.splitters.unsorted.bam -o Normal.splitters.bam
 
 
 ####################  Tumour #####################
@@ -32,8 +32,8 @@ samtools view -h "$Tumour_Bam" \
     | samtools view -Sb - \
     > Tumour.splitters.unsorted.bam
 
-samtools sort Tumour.discordants.unsorted.bam Tumour.discordants.bam
-samtools sort Tumour.splitters.unsorted.bam Tumour.splitters.bam
+samtools sort Tumour.discordants.unsorted.bam -o Tumour.discordants.bam
+samtools sort Tumour.splitters.unsorted.bam -o Tumour.splitters.bam
 
 lumpyexpress \
     -B $Tumour_Bam,$Normal_Bam \
