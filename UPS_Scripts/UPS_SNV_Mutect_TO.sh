@@ -16,8 +16,10 @@ fi
 echo "$Reference_Genome"
 echo "$Tumour_Bam"
 
-gatk-launch CreateSequenceDictionary -R "$Reference_Genome"
+gatk CreateSequenceDictionary -R "$Reference_Genome"
 
-gatk Mutect2  -R "$Reference_Genome" -I "$Tumour_Bam" -O Mutect2_unfiltered.vcf.gz
+gatk Mutect2 --tmp-dir:"." -R "$Reference_Genome" -I "$Tumour_Bam" -O "Mutect2_unfiltered.vcf.gz"
 
-gatk FilterMutectCalls -R ref.fasta -V Mutect2_unfiltered.vcf.gz -O Mutect2_filtered.vcf
+gatk FilterMutectCalls -R "$Reference_Genome" \
+                       -V "Mutect2_unfiltered.vcf.gz" \
+                       -O "Mutect2_filtered.vcf" 
