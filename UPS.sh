@@ -20,7 +20,7 @@ Count_Job_Type() {
 
 #################################### 
 # Parses Command Line 
-####################################
+#################################### 
 
 sg_flag=false  
 cf_flag=false  
@@ -107,7 +107,7 @@ N_invalid=$(awk -F',' 'index($4, "Invalid") {count++} END {print count}' Sample_
 if [[ "$N_invalid" -gt 0 ]]; then
     echo "Error! Sample map validation failed missing coloumns or incorrect data. 
 Please see Sample_Map_Validation_Report.csv for more details. "
-    #exit 1
+    exit 1
 fi
 
 #################################### 
@@ -193,12 +193,24 @@ do
         mkdir -p "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant"
     fi
 
+     if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Single_Nucleotide_Variant/Mutect" ]; then
+        mkdir -p "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
+    fi
+
     if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Structural_Variant" ]; then
         mkdir -p "$O/UPS/Samples/$Current_Patient_id/Structural_Variant"
     fi
 
+    if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Structural_Variant/Lumpy" ]; then
+        mkdir -p "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+    fi
+
     if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Copy_Number_Variation" ]; then
         mkdir -p "$O/UPS/Samples/$Current_Patient_id/Copy_Number_Variation"
+    fi
+
+    if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Copy_Number_Variation/CNVkit" ]; then
+        mkdir -p "$O/UPS/Samples/$Current_Patient_id/Copy_Number_Variation/CNVkit"
     fi
 
     if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Plots" ]; then
@@ -218,6 +230,13 @@ do
             filePath=$(echo "$line" | awk '{print $10}')
             CurrentSample=$(echo "$line" | awk '{print $1}')
             cd "$O/UPS/Samples/$Current_Patient_id/SRA"
+            # Select reference for WGS or WES
+            if  [ "$W" == "WGS" ]; then
+                $ReferenceGenome=$Support_Path/"HG38_WGS.fasta"
+            else if [ "$W" == "WES" ]; then
+                $ReferenceGenome=$Support_Path/"HG38_WES.fasta"
+            fi
+
             if [ ! -f "$CurrentSample""_pass_1.fastq.gz" ]; then
                 echo "Extraction Needed for $CurrentSample"
                 while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]
@@ -293,44 +312,61 @@ for Current_Patient_id in "${unique_patient_ids[@]}"; do
     cd "$O/UPS/Samples/$Current_Patient_id/BAM"
     TumourFileFlag="Negtive"
     NormalFileFlag="Negtive"
-    TumourFileFile=""
-    NormalFileFile=""
+    TumourFile=""
+    NormalFile=""
 
+    
     echo $Current_Patient_id
      for line in "${SM_array[@]}"; do
         # Check if the line contains the Patient_ID and "SSR" or "FASTq"
         if [[ "$line" == *"$Current_Patient_id"*"Normal"* ]]; then
             NormalFileFlag="Present"
-            NormalFileFile="$Current_Patient_id""_Normal.Bam"
+            NormalFile="$Current_Patient_id""_Normal.Bam"
         fi
 
         if [[ "$line" == *"$Current_Patient_id"*"Tumour"* ]]; then
             TumourFileFlag="Present"
-            TumourFileFile="$Current_Patient_id""_Tumour.Bam"
+            TumourFile="$Current_Patient_id""_Tumour.Bam"
         fi
         Sequencing_Type=$(echo "$line" | awk -F',' '{print $6}')
+
+        if [[ "$line" == *"$Current_Patient_id"*"WGS"* ]]; then
+            WGSWESFlag="WGS"
+        fi
+        if [[ "$line" == *"$Current_Patient_id"*"WES"* ]]; then
+            WGSWESFlag="WES"
+        fi
+        
     done
 
+    if [[ WGSWESFlag="WES" ]]; then
+        Reference_Genome_Index="WES_to_be_fixed"
+    else 
+        Reference_Genome_Index="WGS_to_be_fixed"
+    fi
+
     #check if SNV have allready been called 
-    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/tumorSV.vcf.gz" ]; then
+    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect/Filtered_somatic.vcf.gz" ]; then
         while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
             sleep 30
         done
         sbatch "$UPS_Script_File""UPS_SNV_Mutect.sh" \
--R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
--PTFlaf "$TumourFileFlag" -PTFile "$TumourFileFile" \
--PNFlaf "$NormalFileFlag" -PNFile "$NormalFileFile" 
+        -R $Reference_Genome_Index -S $Current_Patient_id -ST $Sequencing_Type \
+        -PTFlaf $TumourFileFlag -PTFile $TumourFile \
+        -PNFlaf $NormalFileFlag -PNFile $NormalFile \
+        -Support $Support_Path -O $O 
     fi
     
     #check if SV have allready been called 
-    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/tumorSV.vcf.gz" ]; then
+    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy/Lumpy.vcf" ]; then
         while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
             sleep 30
         done
         sbatch "$UPS_Script_File""UPS_SV_Manta.sh" \
--R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
--PTFlaf "$TumourFileFlag" -PTFile "$TumourFileFile" \
--PNFlaf "$NormalFileFlag" -PNFile "$NormalFileFile" 
+        -R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
+        -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
+        -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
+        -Support $Support_Path -O $O 
     fi
 
      #check if CNV have allready been called 
@@ -339,9 +375,10 @@ for Current_Patient_id in "${unique_patient_ids[@]}"; do
             sleep 30
         done
         sbatch "$UPS_Script_File""UPS_CNV_CNVkit.sh" \
--R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
--PTFlaf "$TumourFileFlag" -PTFile "$TumourFileFile" \
--PNFlaf "$NormalFileFlag" -PNFile "$NormalFileFile" 
+        -R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
+        -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
+        -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
+        -Support $Support_Path -O $O 
     fi    
 
     # Summerise result in gene centric tables 
@@ -349,6 +386,7 @@ for Current_Patient_id in "${unique_patient_ids[@]}"; do
     # Visualization 
 
     # Sample Report 
+
 done 
 
 # Summery tables
