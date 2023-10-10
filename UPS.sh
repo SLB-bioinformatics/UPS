@@ -1,7 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=USP_Orchestrator
 
-#export NCBI_HOME=/mnt/beegfs/hassan/Stuart/
+# sbatch UPS/UPS.sh -SG SampleMapOSSupperShort.csv -CF Configuration_File.YAML  -O Output/
+
+i=$(pwd)
+
+export NCBI_HOME=/mnt/beegfs/hassan/Stuart/
+
 
 ####################################
 # Functions
@@ -33,7 +38,7 @@ for arg in "$@"; do # Parses the command line input to identife Sample Map, Conf
                 sg_flag=true 
                 shift 2 
             else
-                echo "Error: -SG argument requires a value."
+                echo "Error: -SG argument requires a a Sample guide .csv"
                 exit 1
             fi
             ;;
@@ -43,7 +48,7 @@ for arg in "$@"; do # Parses the command line input to identife Sample Map, Conf
                 cf_flag=true  
                 shift 2 
             else
-                echo "Error: -CF argument requires a value."
+                echo "Error: -CF argument requires a configuation file"
                 exit 1
             fi
             ;;
@@ -51,15 +56,10 @@ for arg in "$@"; do # Parses the command line input to identife Sample Map, Conf
             if  [[ $# -gt 1 && ! "$2" =~ ^- ]]; then
                 O="$2"  
                 shift 2 
-            else
-                echo "Error: -O argument requires a value."
-                exit 1
             fi
             ;;
     esac
 done
-cd $O
-O=$(pwd)
 
 #################################### 
 # Get Setting From Configuration File YAML 
@@ -83,12 +83,16 @@ if    [ -z "$Batch_Job_Limit" ] || [ -z "$Reference_Genome" ] || [ -z "$UPS_Scri
         Batch_Job_Limit:    The max number of jobs to run at once.
         Reference_Genome:   Path to the reference genome fasta file.
         UPS_Script_File:    Path to where the UPS scripts are located.
-        Tumour_Normal:      Only accepts values of Tumour or Normal.
         Gene_of_Intrest:    Not required but priotisies plots for this gene in the report.
         Packages:           Path to where the required Packages are located.
         Support_Path:       Path to where the UPS support data"
   exit 1
 fi
+
+
+cd $O
+O=$(pwd)
+
 
 #################################### 
 # Validate Sample Map csv
@@ -96,34 +100,34 @@ fi
 
 echo "Validating Sample Map"
 ## hashed out for development on non slurm systems 
- cd "$O"
- sbatch "${UPS_Script_File}UPS_Sample_Map_Validation.R" $sg_argument
+#Rscript "${UPS_Script_File}UPS_Sample_Map_Validation.R" $sg_argument
 
-while ! [ -e "Sample_Map_Validation_Report.csv" ]; do
-  sleep 10
-done
+#while ! [ -e "Sample_Map_Validation_Report.csv" ]; do
+#  sleep 10
+#done
 
-N_invalid=$(awk -F',' 'index($4, "Invalid") {count++} END {print count}' Sample_Map_Validation_Report.csv)
-if [[ "$N_invalid" -gt 0 ]]; then
-    echo "Error! Sample map validation failed missing coloumns or incorrect data. 
-Please see Sample_Map_Validation_Report.csv for more details. "
-    exit 1
-fi
+
+#N_invalid=$(awk -F',' 'inlsdex($4, "Invalid") {count++} END {print count}' Sample_Map_Validation_Report.csv)
+#if [[ "$N_invalid" -gt 0 ]]; then
+#    echo "Error! Sample map validation failed missing coloumns or incorrect data. 
+#Please see Sample_Map_Validation_Report.csv for more details. "
+#    exit 1
+#fi
 
 #################################### 
 # Set Up Directory Structure 
 ####################################
 
-SM_array="Sample_Map_Validation_Report.csv"
-Sample_ID_pos=$(awk -F',' 'NR==2 { print $3 }' "$SM_array")
-Cohort_pos=$(awk -F',' 'NR==3 { print $3 }' "$SM_array")
-Patient_ID_pos=$(awk -F',' 'NR==4 { print $3 }' "$SM_array")
-Cancer_Type_pos=$(awk -F',' 'NR==5 { print $3 }' "$SM_array")
-Sequencing_Type_pos=$(awk -F',' 'NR==6 { print $3 }' "$SM_array")
-Data_Format_pos=$(awk -F',' 'NR==7 { print $3 }' "$SM_array")
-Source_pos=$(awk -F',' 'NR==8 { print $3 }' "$SM_array")
-Sex_pos=$(awk -F',' 'NR==9 { print $3 }' "$SM_array")
-Location_Of_Data_pos=$(awk -F',' 'NR==10 { print $3 }' "$SM_array")
+#SM_array="Sample_Map_Validation_Report.csv"
+#Sample_ID_pos=$(awk -F',' 'NR==2 { print $3 }' "$SM_array")
+#Cohort_pos=$(awk -F',' 'NR==3 { print $3 }' "$SM_array")
+#Patient_ID_pos=$(awk -F',' 'NR==4 { print $3 }' "$SM_array")
+#Cancer_Type_pos=$(awk -F',' 'NR==5 { print $3 }' "$SM_array")
+#Sequencing_Type_pos=$(awk -F',' 'NR==6 { print $3 }' "$SM_array")
+#Data_Format_pos=$(awk -F',' 'NR==7 { print $3 }' "$SM_array")
+#Source_pos=$(awk -F',' 'NR==8 { print $3 }' "$SM_array")
+#Sex_pos=$(awk -F',' 'NR==9 { print $3 }' "$SM_array")
+#Location_Of_Data_pos=$(awk -F',' 'NR==10 { print $3 }' "$SM_array")
 
 #create USP and directorys 
 if [ ! -d "$O""/UPS" ]; then
@@ -143,7 +147,7 @@ fi
 while IFS=',' read -r Sample_ID Cohort Patient_ID Cancer_Type Sequencing_Type Data_Format Source Sex Location_Of_Data
 do  
     SM_array+=("$Sample_ID, $Cohort, $Patient_ID, $Cancer_Type, $Sequencing_Type, $Data_Format, $Source, $Sex, $Location_Of_Data")
-done < $sg_argument
+done < "$i/$sg_argument"
 
 for element in "${SM_array[@]}"
 do
@@ -170,14 +174,14 @@ do
     fi
 
     for line in "${SM_array[@]}"; do
-        if [[ "$line" == *"$Current_Patient_id"*"SRA"* ]]; then
-            if [ ! -d "$O/UPS/Samples/$Current_Patient_id/SRA" ]; then
-                mkdir -p "$O/UPS/Samples/$Current_Patient_id/SRA"
+        if [[ "$line" == *"$Current_Patient_id"*"SRR"* ]]; then
+            if [ ! -d "$O/UPS/Samples/$Current_Patient_id/FastQ" ]; then
+                mkdir -p "$O/UPS/Samples/$Current_Patient_id/FastQ"
             fi
             break
         fi
 
-        if [[ "$line" == *"$Current_Patient_id"*"SRA"* ]] || [[ "$line" == *"$Current_Patient_id"*"FastQ"* ]]; then
+        if [[ "$line" == *"$Current_Patient_id"*"SRR"* ]] || [[ "$line" == *"$Current_Patient_id"*"FastQ"* ]]; then
             if [ ! -d "$O/UPS/Samples/$Current_Patient_id/FastQ" ]; then
                 mkdir -p "$O/UPS/Samples/$Current_Patient_id/FastQ"
             fi
@@ -201,8 +205,8 @@ do
         mkdir -p "$O/UPS/Samples/$Current_Patient_id/Structural_Variant"
     fi
 
-    if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Structural_Variant/Lumpy" ]; then
-        mkdir -p "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy"
+    if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Structural_Variant/Manta" ]; then
+        mkdir -p "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Manta"
     fi
 
     if [ ! -d "$O/UPS/Samples/""$Current_Patient_id/Copy_Number_Variation" ]; then
@@ -222,25 +226,21 @@ done
 # Get BAMs for each Sample
 ####################################
 
-for Current_Patient_id in "${unique_patient_ids[@]}"
-do
+for Current_Patient_id in "${unique_patient_ids[@]}"; do
     for line in "${SM_array[@]}"; do
-        # Check if the line contains the Patient_ID and "SSR" or "FASTq"
-        if [[ "$line" == *"$Current_Patient_id"*"SRA"* ]]; then
-            filePath=$(echo "$line" | awk '{print $10}')
+        IFS=',' read -ra fields <<< "$line"
+        # Check if the line contains the Patient_ID and "SRA" or "FASTq"
+        
+        if [[ "$line" == *"$Current_Patient_id"*"SRR"* ]]; then
+            filePath=$(echo "$line" | awk '{print $11}')
             CurrentSample=$(echo "$line" | awk '{print $1}')
-            cd "$O/UPS/Samples/$Current_Patient_id/SRA"
-            # Select reference for WGS or WES
-            if  [ "$W" == "WGS" ]; then
-                $ReferenceGenome=$Support_Path/"HG38_WGS.fasta"
-            else if [ "$W" == "WES" ]; then
-                $ReferenceGenome=$Support_Path/"HG38_WES.fasta"
-            fi
+            cd "$O/UPS/Samples/$Current_Patient_id/FastQ"
+            ReferenceGenome="$Support_Path/HG38.fasta"
+            
 
             if [ ! -f "$CurrentSample""_pass_1.fastq.gz" ]; then
                 echo "Extraction Needed for $CurrentSample"
-                while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]
-                do
+                while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
                     sleep 30
                 done
                 sbatch "$UPS_Script_File""UPS_Fastq-dump.sh" "$filePath"
@@ -250,45 +250,61 @@ do
         if [[ "$line" == *"$Current_Patient_id"*"FastQ"* ]]; then
             filePath=$(echo "$line" | awk -F',' '{print $10}')
             cd "$O/UPS/Samples/$Current_Patient_id/FastQ"
-            #remove the _1.fastq.gz substing if it is still there
+            # Remove the _1.fastq.gz substring if it is still there
             if [[ $filePath == *_1.fastq.gz ]]; then
                 filePath="${filePath%%_1.fastq.gz}"
             fi
             filePath="$(echo -e "${filePath}" | tr -d '[:space:]')"
             if [ ! -f "$filePath""_1.fastq.gz" ]; then
-                echo "cp "$Input_Path""$filePath""_1.fastq.gz"  ."
-                echo "cp "$Input_Path""$filePath""_2.fastq.gz"  ."
-                
+                cp $Input_Path$filePath""_1.fastq.gz .
+                cp $Input_Path$filePath""_2.fastq.gz .
             fi
+           
         fi
         
+
+    
+
         if [[ "$line" == *"$Current_Patient_id"*"BAM"* ]]; then
             cd "$O/UPS/Samples/$Current_Patient_id/BAM"
             filePath=$(echo "$line" | awk '{print $10}')
-            if [ ! -f "${Current_SSR}.bam" ]; then
-                echo "cp $filePath ."
+        
+            if [[ "${fields[4]}" == *"Yes"* ]]; then
+                filename="$Current_Patient_id""_Tumour.bam"
+                if [ ! -f "$filename" ]; then
+                    echo "Moving $filename"
+                    cp "$filePath" "$filename"
+                fi
+            fi
+        
+            if [[ "${fields[4]}" == *"No"* ]]; then
+                filename="$Current_Patient_id""_Normal.bam"
+                if [ ! -f "$filename" ]; then
+                    echo "Moving $filename"
+                    cp "$filePath" "$filename"
+                fi
             fi
         fi
     done
-done 
+done
 
 Count_Job_Type "Fastq-dump"
-while [ $Current_Job_Count -gt 0 ]; then
+while [ $Current_Job_Count -gt 0 ]; do
     sleep 30
-fi
+done
 
 
 for Current_Patient_id in "${unique_patient_ids[@]}"
 do
     for line in "${SM_array[@]}"; do
         # Check if the line contains the Patient_ID and "SSR" or "FASTq"
-        if [[ "$line" == *"$Current_Patient_id"*"SRA"* ]] || [[ $filePath == *_1.fastq.gz ]]; then
+        if [[ "$line" == *"$Current_Patient_id"*"SRR"* ]] || [[ $filePath == *"_1.fastq.gz"* ]]; then
             filePath=$(echo "$line" | awk '{print $10}')
             
 
-            cd "$O/UPS/Samples/$Current_Patient_id/FastQ"
+            cd "$O/UPS/Samples/$Current_Patient_id/BAM"
             filePath="$(echo -e "${Current_Patient_id}" | tr -d '[:space:]')"
-            File1="$Current_Patient_id""_1.fastq.gz"
+            File1="$Current_Patient_id""_1.fastq.gz"c
             File2="$Current_Patient_id""_2.fastq.gz"
             while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
                 sleep 30
@@ -299,9 +315,9 @@ do
 done 
 
 Count_Job_Type "FastqToBam"
-while [ $Current_Job_Count -gt 0 ]; then
+while [ $Current_Job_Count -gt 0 ]; do
     sleep 30
-fi
+done
 
 #################################### 
 # Get SNV, SV, and CNVs for each Sample
@@ -317,68 +333,79 @@ for Current_Patient_id in "${unique_patient_ids[@]}"; do
 
     
     echo $Current_Patient_id
-     for line in "${SM_array[@]}"; do
-        # Check if the line contains the Patient_ID and "SSR" or "FASTq"
-        if [[ "$line" == *"$Current_Patient_id"*"Normal"* ]]; then
-            NormalFileFlag="Present"
-            NormalFile="$Current_Patient_id""_Normal.Bam"
+    for line in "${SM_array[@]}"; do
+        IFS=',' read -ra fields <<< "$line"
+        if [[ "$line" == *"$Current_Patient_id"* ]]; then
+            if [[ "${fields[4]}" == *"Yes"* ]]; then
+                TumourFileFlag="Present"
+                TumourFile="$O/UPS/Samples/$Current_Patient_id/BAM/$Current_Patient_id""_Tumour.bam"
+            elif [[ "${fields[4]}" == *"No"* ]]; then
+                NormalFileFlag="Present"
+                NormalFile="$O/UPS/Samples/$Current_Patient_id/BAM/$Current_Patient_id""_Normal.bam"
+            fi
+    
+            if [[ "${fields[5]}" == *"WGS"* ]]; then
+                WGSWESFlag="WGS"
+            elif [[ "${fields[5]}" == *"WES"* ]]; then
+                WGSWESFlag="WES"
+            fi
         fi
-
-        if [[ "$line" == *"$Current_Patient_id"*"Tumour"* ]]; then
-            TumourFileFlag="Present"
-            TumourFile="$Current_Patient_id""_Tumour.Bam"
-        fi
-        Sequencing_Type=$(echo "$line" | awk -F',' '{print $6}')
-
-        if [[ "$line" == *"$Current_Patient_id"*"WGS"* ]]; then
-            WGSWESFlag="WGS"
-        fi
-        if [[ "$line" == *"$Current_Patient_id"*"WES"* ]]; then
-            WGSWESFlag="WES"
-        fi
-        
     done
-
-    if [[ WGSWESFlag="WES" ]]; then
-        Reference_Genome_Index="WES_to_be_fixed"
-    else 
-        Reference_Genome_Index="WGS_to_be_fixed"
-    fi
 
     #check if SNV have allready been called 
     if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect/Filtered_somatic.vcf.gz" ]; then
         while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
             sleep 30
         done
+        cd "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect/"
         sbatch "$UPS_Script_File""UPS_SNV_Mutect.sh" \
-        -R $Reference_Genome_Index -S $Current_Patient_id -ST $Sequencing_Type \
+        -R $Reference_Genome -S $Current_Patient_id -ST $Sequencing_Type \
         -PTFlaf $TumourFileFlag -PTFile $TumourFile \
         -PNFlaf $NormalFileFlag -PNFile $NormalFile \
         -Support $Support_Path -O $O 
+        echo "sbatch "$UPS_Script_File""UPS_SNV_Mutect.sh" \
+        -R $Reference_Genome -S $Current_Patient_id -ST $Sequencing_Type \
+        -PTFlaf $TumourFileFlag -PTFile $TumourFile \
+        -PNFlaf $NormalFileFlag -PNFile $NormalFile \
+        -Support $Support_Path -O $O "
     fi
     
     #check if SV have allready been called 
-    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Lumpy/Lumpy.vcf" ]; then
+    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Manta/Manta.vcf" ]; then
         while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
             sleep 30
         done
+        cd "$O/UPS/Samples/$Current_Patient_id/Structural_Variant/Manta/"
         sbatch "$UPS_Script_File""UPS_SV_Manta.sh" \
-        -R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
+        -R "$Reference_Genome" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
         -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
         -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
         -Support $Support_Path -O $O 
+        echo "sbatch "$UPS_Script_File""UPS_SV_Manta.sh" \
+        -R "$Reference_Genome" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
+        -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
+        -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
+        -Support $Support_Path -O $O squeue"
     fi
 
      #check if CNV have allready been called 
-    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/tumorSV.vcf.gz" ]; then
+    if [ ! -f "$O/UPS/Samples/$Current_Patient_id/Copy_Number_Variation/CNVkit" ]; then
         while [[ $(Count_Total_Jobs) -gt $Batch_Job_Limit ]]; do
             sleep 30
         done
+        cd "$O/UPS/Samples/$Current_Patient_id/Copy_Number_Variation/CNVkit"
         sbatch "$UPS_Script_File""UPS_CNV_CNVkit.sh" \
-        -R "$Reference_Genome_Index" -S "$Current_Patient_id" -ST "$Sequencing_Type" \
+        -R "$Reference_Genome" -S "$Current_Patient_id" \
         -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
         -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
-        -Support $Support_Path -O $O 
+        -Support $Support_Path -O $O -WE $WGSWESFlag 
+        
+        echo "sbatch "$UPS_Script_File""UPS_CNV_CNVkit.sh" \
+        -R "$Reference_Genome" -S "$Current_Patient_id" \
+        -PTFlaf "$TumourFileFlag" -PTFile "$TumourFile" \
+        -PNFlaf "$NormalFileFlag" -PNFile "$NormalFile" \
+        -Support $Support_Path -O $O -WE $WGSWESFlag "
+       
     fi    
 
     # Summerise result in gene centric tables 
@@ -394,4 +421,5 @@ done
 # Visualization
 
 # Total Report
+
 
