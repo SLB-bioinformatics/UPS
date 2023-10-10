@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=SNV_Manta_TO
+#SBATCH --job-name=SNV_Manta
 #SBATCH --mem=10G
 
 # Initialize variables with default values
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check for missing required arguments
-if [ -z "$Reference_Genome_Index" ] || [ -z "$Current_Patient_id" ] || [ -z "$Sequencing_Type" ]; then
+if [ -z "$Reference_Genome_Index" ] || [ -z "$Current_Patient_id" ]; then
     echo "Error: Missing required arguments."
     exit 1
 fi
@@ -76,7 +76,7 @@ echo "TumourFile: $TumourFile"
 echo "NormalFileFlag: $NormalFileFlag"
 echo "NormalFile: $NormalFile"
 echo "Support_Path: $Support_Path"
-echo "O: $O"
+echo "O: $O"c
 
 
 module load MANTA
@@ -87,7 +87,7 @@ Tumour_Bam="$2"
 
 
 if [ "$TumourFileFlag" == "Present" ] && [ "$NormalFileFlag" == "Present" ]; then
-    ${MANTA_INSTALL_PATH}/bin/configManta.py \
+    configManta.py \
         --normalBam $NormalFile \
         --tumorBam $TumourFile \
         --referenceFasta $Reference_Genome_Index \
@@ -104,5 +104,3 @@ else if [ "$TumourFileFlag" == "Present" ] || [ "$NormalFileFlag" == "Present" ]
         --referenceFasta $Reference_Genome \
         --runDir .
 fi
-
-

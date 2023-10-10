@@ -1,6 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=SNV_Mutect_TO
+#SBATCH --job-name=SNV_Mutect
 #SBATCH --mem=10G
+
+module load SAMTOOLS
+module load GATK
 
 # Initialize variables with default values
 Reference_Genome_Index=""
@@ -20,10 +23,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -S)
             Current_Patient_id="$2"
-            shift 2
-            ;;
-        -ST)
-            Sequencing_Type="$2"
             shift 2
             ;;
         -PTFlaf)
@@ -50,15 +49,11 @@ while [[ $# -gt 0 ]]; do
             O="$2"
             shift 2
             ;;
-        *)
-            echo "Error: Unknown argument $1"
-            exit 1
-            ;;
     esac
 done
 
 # Check for missing required arguments
-if [ -z "$Reference_Genome_Index" ] || [ -z "$Current_Patient_id" ] || [ -z "$Sequencing_Type" ]; then
+if [ -z "$Reference_Genome_Index" ] || [ -z "$Current_Patient_id" ] ; then
     echo "Error: Missing required arguments."
     exit 1
 fi
@@ -66,7 +61,6 @@ fi
 # Print the parsed values for testing
 echo "Reference_Genome_Index: $Reference_Genome_Index"
 echo "Current_Patient_id: $Current_Patient_id"
-echo "Sequencing_Type: $Sequencing_Type"
 echo "TumourFileFlag: $TumourFileFlag"
 echo "TumourFile: $TumourFile"
 echo "NormalFileFlag: $NormalFileFlag"
@@ -74,8 +68,7 @@ echo "NormalFile: $NormalFile"
 echo "Support_Path: $Support_Path"
 echo "O: $O"
 
-module load SAMTOOLS
-module load GATK
+
 
 cd "$O/UPS/Samples/$Current_Patient_id/Single_Nucleotide_Variant/Mutect"
 
